@@ -5,9 +5,13 @@ const cors = require("cors");
 const path = require("path");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+}));
 
+app.options("*", cors());
 // ✅ FRONTEND SERVE
 app.use(express.static(path.join(__dirname, "../frontend")));
 
