@@ -12,6 +12,8 @@ app.use(cors({
 }));
 
 app.options("*", cors());
+app.use(express.json());
+
 // ✅ FRONTEND SERVE
 app.use(express.static(path.join(__dirname, "../frontend")));
 
