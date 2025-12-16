@@ -1,130 +1,130 @@
+require("dotenv").config();
+
 const express = require("express");
-const sql = require("mssql");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
-const path = require("path");
+const pool = require("./db");
 
 const app = express();
-app.use(cors());
+
+/* ======================
+   CORS (ÇOK ÖNEMLİ)
+====================== */
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"]
+}));
+
+// Preflight fix
+app.options("*", cors());
+
+/* ======================
+   MIDDLEWARE
+====================== */
 app.use(express.json());
 
-// ✅ FRONTEND SERVE
-app.use(express.static(path.join(__dirname, "../frontend")));
-
-// ✅ ROOT LOGIN SAYFASI
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/index.html"));
+/* ======================
+   HEALTH CHECK
+====================== */
+app.get("/health", (req, res) => {
+  res.status(200).json({ ok: true });
 });
 
-// ✅ SQL SERVER CONFIG
-const dbConfig = {
-  user: "sa",
-  password: "password1234",
-  server: "DESKTOP-FPQL6PA\\SQLEXPRESS",
-  database: "MoodQuotesDB",
-  options: {
-    trustServerCertificate: true
-  }
-};
-
-const pool = new sql.ConnectionPool(dbConfig);
-
-// ✅ CONNECT
-pool.connect()
-  .then(() => console.log("✅ Database connected"))
-  .catch(err => console.error("❌ Database connection error:", err));
-
-
-// =========================
-// ✅ REGISTER ROUTE (YENİ)
-// =========================
+/* ======================
+   REGISTER
+====================== */
 app.post("/register", async (req, res) => {
   try {
-    let { username, password } = req.body;
-
-    username = username.trim();
-    password = password.trim();
+    const { username, password } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ message: "Username and password required" });
+      return res.status(400).json({
+        message: "Username and password required"
+      });
     }
 
-    // ✅ Aynı kullanıcı var mı kontrol et
-    const existing = await pool.request()
-      .input("username", sql.NVarChar, username)
-      .query("SELECT * FROM Users WHERE Username = @username");
+    const existingUser = await pool.query(
+      "SELECT userid FROM users WHERE username = $1",
+      [username]
+    );
 
-    if (existing.recordset.length > 0) {
-      return res.status(409).json({ message: "Username already exists" });
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        message: "Username already exists"
+      });
     }
 
-    // ✅ Şifreyi hashle
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // ✅ DB'ye ekle
-    await pool.request()
-      .input("username", sql.NVarChar, username)
-      .input("password", sql.NVarChar, hashedPassword)
-      .query(`
-        INSERT INTO Users (Username, PasswordHash)
-        VALUES (@username, @password)
-      `);
+    await pool.query(
+      "INSERT INTO users (username, passwordhash) VALUES ($1, $2)",
+      [username, hashedPassword]
+    );
 
-    console.log("✅ REGISTER OK:", username);
-
-    res.json({ message: "REGISTER OK" });
-
-  } catch (err) {
-    console.error("🔥 Register error:", err);
-    res.status(500).json({ message: "Register server error" });
-  }
-});
-
-
-// =========================
-// ✅ LOGIN ROUTE (MEVCUT)
-// =========================
-app.post("/login", async (req, res) => {
-  try {
-    let { username, password } = req.body;
-
-    username = username.trim();
-    password = password.trim();
-
-    console.log("📥 LOGIN REQUEST:", username);
-
-    const result = await pool.request()
-      .input("username", sql.NVarChar, username)
-      .query("SELECT * FROM Users WHERE Username = @username");
-
-    if (result.recordset.length === 0) {
-      return res.status(401).json({ message: "User not found" });
-    }
-
-    const user = result.recordset[0];
-
-    const match = await bcrypt.compare(password, user.PasswordHash);
-
-    if (!match) {
-      return res.status(401).json({ message: "Incorrect password" });
-    }
-
-    console.log("✅ LOGIN OK:", username);
-
-    res.json({
-      message: "LOGIN OK",
-      userID: user.UserID,
-      username: user.Username
+    res.status(201).json({
+      message: "User registered successfully"
     });
 
   } catch (err) {
-    console.error("🔥 Login error:", err);
-    res.status(500).json({ message: "Login server error" });
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({
+      message: "Register server error"
+    });
   }
 });
 
+/* ======================
+   LOGIN
+====================== */
+app.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-// ✅ SERVER START
-app.listen(3000, () => {
-  console.log("🔥 Server running on port 3000");
+    if (!username || !password) {
+      return res.status(400).json({
+        message: "Username and password required"
+      });
+    }
+
+    const result = await pool.query(
+      "SELECT userid, username, passwordhash FROM users WHERE username = $1",
+      [username]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        message: "User not found"
+      });
+    }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.passwordhash);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Incorrect password"
+      });
+    }
+
+    res.status(200).json({
+      message: "LOGIN OK",
+      username: user.username
+    });
+
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({
+      message: "Login server error"
+    });
+  }
+});
+
+/* ======================
+   START SERVER
+====================== */
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
 });
