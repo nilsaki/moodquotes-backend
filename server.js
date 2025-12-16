@@ -121,6 +121,53 @@ app.post("/login", async (req, res) => {
 });
 
 /* ======================
+   COMMENTS – ADD
+====================== */
+app.post("/comments", async (req, res) => {
+  try {
+    const { quote_text, username, comment } = req.body;
+
+    if (!quote_text || !username || !comment) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    await pool.query(
+      "INSERT INTO comments (quote_text, username, comment) VALUES ($1, $2, $3)",
+      [quote_text, username, comment]
+    );
+
+    res.status(201).json({ message: "Comment added" });
+  } catch (err) {
+    console.error("ADD COMMENT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ======================
+   COMMENTS – GET
+====================== */
+app.get("/comments", async (req, res) => {
+  try {
+    const { quote } = req.query;
+
+    if (!quote) {
+      return res.status(400).json({ message: "Quote required" });
+    }
+
+    const result = await pool.query(
+      "SELECT username, comment FROM comments WHERE quote_text = $1 ORDER BY created_at ASC",
+      [quote]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET COMMENTS ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+/* ======================
    START SERVER
 ====================== */
 const PORT = process.env.PORT || 3000;
