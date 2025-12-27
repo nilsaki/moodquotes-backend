@@ -12,7 +12,7 @@ const app = express();
 ====================== */
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type"]
 }));
 
@@ -171,7 +171,7 @@ app.get("/comments", async (req, res) => {
 ====================== */
 app.put("/comments/:id", async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
     const { username, comment } = req.body;
 
     if (!comment || !username) {
@@ -179,7 +179,7 @@ app.put("/comments/:id", async (req, res) => {
     }
 
     const result = await pool.query(
-      "UPDATE comments SET comment = $1 WHERE id = $2 AND username = $3 RETURNING *",
+      "UPDATE comments SET comment = $1 WHERE id = $2 AND username = $3 RETURNING id",
       [comment, id, username]
     );
 
@@ -200,11 +200,11 @@ app.put("/comments/:id", async (req, res) => {
 ====================== */
 app.delete("/comments/:id", async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
     const { username } = req.body;
 
     const result = await pool.query(
-      "DELETE FROM comments WHERE id = $1 AND username = $2",
+      "DELETE FROM comments WHERE id = $1 AND username = $2 RETURNING id",
       [id, username]
     );
 
