@@ -95,38 +95,51 @@ app.get("/comments", async (req, res) => {
    COMMENTS – UPDATE
 ====================== */
 app.put("/comments/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const { username } = req.query;
-  const { comment } = req.body;
+  try {
+    const { id } = req.params;
+    const { username, comment } = req.body;
 
-  const r = await pool.query(
-    "UPDATE comments SET comment=$1 WHERE id=$2 AND username=$3",
-    [comment, id, username]
-  );
+    const result = await pool.query(
+      "UPDATE comments SET comment = $1 WHERE id = $2 AND username = $3",
+      [comment, id, username]
+    );
 
-  if (!r.rowCount)
-    return res.status(403).json({ message: "Not allowed" });
+    if (result.rowCount === 0) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
 
-  res.json({ message: "Updated" });
+    res.json({ message: "Comment updated" });
+  } catch (err) {
+    console.error("EDIT COMMENT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
+
 
 /* ======================
    COMMENTS – DELETE
 ====================== */
 app.delete("/comments/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const { username } = req.query;
+  try {
+    const { id } = req.params;
+    const { username } = req.body;
 
-  const r = await pool.query(
-    "DELETE FROM comments WHERE id=$1 AND username=$2",
-    [id, username]
-  );
+    const result = await pool.query(
+      "DELETE FROM comments WHERE id = $1 AND username = $2",
+      [id, username]
+    );
 
-  if (!r.rowCount)
-    return res.status(403).json({ message: "Not allowed" });
+    if (result.rowCount === 0) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
 
-  res.json({ message: "Deleted" });
+    res.json({ message: "Comment deleted" });
+  } catch (err) {
+    console.error("DELETE COMMENT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
+
 
 /* ======================
    START
