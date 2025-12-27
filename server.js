@@ -8,7 +8,7 @@ const pool = require("./db");
 const app = express();
 
 /* ======================
-   CORS (ÇOK ÖNEMLİ)
+   CORS 
 ====================== */
 app.use(cors({
   origin: "*",
@@ -155,13 +155,73 @@ app.get("/comments", async (req, res) => {
     }
 
     const result = await pool.query(
-      "SELECT username, comment FROM comments WHERE quote_text = $1 ORDER BY created_at ASC",
+     "SELECT id, username, comment FROM comments WHERE quote_text = $1 ORDER BY created_at ASC",
       [quote]
     );
 
     res.json(result.rows);
   } catch (err) {
     console.error("GET COMMENTS ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ======================
+   COMMENTS – UPDATE
+====================== */
+app.put("/comments/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, comment } = req.body;
+
+    if (!username || !comment) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const result = await pool.query(
+      `UPDATE comments
+       SET comment = $1, updated_at = NOW()
+       WHERE id = $2 AND username = $3`,
+      [comment, id, username]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    res.json({ message: "Comment updated" });
+
+  } catch (err) {
+    console.error("UPDATE COMMENT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ======================
+   COMMENTS – DELETE
+====================== */
+app.delete("/comments/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ message: "Username required" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM comments WHERE id = $1 AND username = $2",
+      [id, username]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    res.json({ message: "Comment deleted" });
+
+  } catch (err) {
+    console.error("DELETE COMMENT ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
