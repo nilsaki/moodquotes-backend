@@ -140,6 +140,63 @@ app.delete("/comments/:id", async (req, res) => {
   }
 });
 
+/* ======================
+   COMMENTS – LIKE / DISLIKE
+====================== */
+app.post("/comments/:id/vote", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, vote } = req.body; // vote: 'like' | 'dislike'
+
+    if (!username || !vote) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    const existing = await pool.query(
+      "SELECT vote_type FROM comment_votes WHERE comment_id=$1 AND username=$2",
+      [id, username]
+    );
+
+    if (existing.rows.length === 0) {
+      // first vote
+      await pool.query(
+        "INSERT INTO comment_votes (comment_id, username, vote_type) VALUES ($1,$2,$3)",
+        [id, username, vote]
+      );
+
+      await pool.query(
+        vote === "like"
+          ? "UPDATE comments SET likes = likes + 1 WHERE id=$1"
+          : "UPDATE comments SET dislikes = dislikes + 1 WHERE id=$1",
+        [id]
+      );
+    } else {
+      const oldVote = existing.rows[0].vote_type;
+      if (oldVote === vote) {
+        return res.json({ message: "Already voted" });
+      }
+
+      // change vote
+      await pool.query(
+        "UPDATE comment_votes SET vote_type=$1 WHERE comment_id=$2 AND username=$3",
+        [vote, id, username]
+      );
+
+      await pool.query(
+        oldVote === "like"
+          ? "UPDATE comments SET likes = likes - 1, dislikes = dislikes + 1 WHERE id=$1"
+          : "UPDATE comments SET dislikes = dislikes - 1, likes = likes + 1 WHERE id=$1",
+        [id]
+      );
+    }
+
+    res.json({ message: "Vote updated" });
+  } catch (err) {
+    console.error("VOTE ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 /* ======================
    START
